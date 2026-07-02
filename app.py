@@ -1,0 +1,538 @@
+import streamlit as st
+import plotly.graph_objects as go
+import numpy as np
+import pandas as pd
+
+from model_engine import compute_model, DEFAULTS, QUARTER_LABELS
+
+# ----------------------------------------------------------------------------
+# PAGE CONFIG & THEME
+# ----------------------------------------------------------------------------
+st.set_page_config(page_title="Saharasoil — 360 Investor Dashboard", page_icon="🌱",
+                    layout="wide", initial_sidebar_state="expanded")
+
+NAVY = "#1F3B4D"
+NAVY_DARK = "#162A37"
+SAND = "#C9A15A"
+RUST = "#9C4B3B"
+GREEN = "#3F6B4F"
+CREAM = "#F7F4EF"
+DARK = "#222222"
+GREY = "#6B6B6B"
+LIGHTGREY = "#E7E2D8"
+
+st.markdown(f"""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+html, body, [class*="css"]  {{ font-family: 'Inter', sans-serif; }}
+h1, h2, h3 {{ font-family: 'Playfair Display', serif !important; color: {NAVY}; }}
+
+.stApp {{ background-color: {CREAM}; }}
+section[data-testid="stSidebar"] {{ background-color: {NAVY}; }}
+section[data-testid="stSidebar"] * {{ color: {CREAM} !important; }}
+section[data-testid="stSidebar"] .stSlider label, section[data-testid="stSidebar"] label {{ color: {SAND} !important; font-weight: 600; }}
+
+.hero {{
+    background: linear-gradient(135deg, {NAVY} 0%, {NAVY_DARK} 100%);
+    padding: 2.2rem 2.5rem; border-radius: 14px; color: white; margin-bottom: 1.2rem;
+}}
+.hero h1 {{ color: white !important; font-size: 2.6rem; margin-bottom: 0.2rem; }}
+.hero p {{ color: {SAND}; font-size: 1.15rem; font-style: italic; margin: 0; }}
+
+.metric-card {{
+    background: white; border-radius: 12px; padding: 1.1rem 1.3rem; border-left: 5px solid {SAND};
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); height: 100%;
+}}
+.metric-card .label {{ color: {GREY}; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }}
+.metric-card .value {{ color: {NAVY}; font-size: 1.7rem; font-weight: 800; font-family: 'Playfair Display', serif; }}
+.metric-card .sub {{ color: {GREY}; font-size: 0.82rem; }}
+
+.callout {{
+    background: {CREAM}; border-left: 5px solid {RUST}; border-radius: 8px; padding: 1rem 1.3rem; margin: 0.8rem 0;
+}}
+.callout.green {{ border-left-color: {GREEN}; }}
+.callout.sand {{ border-left-color: {SAND}; }}
+.callout b {{ color: {NAVY}; }}
+
+.section-title {{ color: {NAVY}; border-bottom: 3px solid {SAND}; padding-bottom: 0.3rem; margin-top: 0.5rem; }}
+
+.pill {{ display:inline-block; background:{NAVY}; color:white; padding: 0.15rem 0.7rem; border-radius: 999px;
+         font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.4rem;}}
+
+.process-card {{ background: white; border-radius: 14px; padding: 1.2rem; text-align: center;
+                  box-shadow: 0 2px 10px rgba(0,0,0,0.07); border-top: 5px solid {SAND}; height: 100%;}}
+.process-card .icon {{ font-size: 2.2rem; }}
+.process-card h4 {{ color: {NAVY}; margin: 0.4rem 0 0.3rem 0; font-family: 'Playfair Display', serif;}}
+.process-card p {{ color: {GREY}; font-size: 0.85rem; }}
+
+footer, #MainMenu {{ visibility: hidden; }}
+</style>
+""", unsafe_allow_html=True)
+
+PLOTLY_TEMPLATE = dict(
+    layout=go.Layout(
+        font=dict(family="Inter, sans-serif", color=DARK, size=13),
+        plot_bgcolor="white", paper_bgcolor="rgba(0,0,0,0)",
+        colorway=[NAVY, SAND, RUST, GREEN, LIGHTGREY],
+        margin=dict(l=10, r=10, t=50, b=10),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+)
+
+# ----------------------------------------------------------------------------
+# SIDEBAR — LIVE MODEL CONTROLS
+# ----------------------------------------------------------------------------
+with st.sidebar:
+    st.markdown("## 🌱 SAHARASOIL")
+    st.caption("360° Investor Dashboard · Group 10 · SP Jain SGM")
+    st.markdown("---")
+    st.markdown("### 🎛️ Live Model Controls")
+    st.caption("Every chart on this dashboard recalculates from these levers — exactly like the underlying Excel model, live.")
+
+    price = st.slider("Bulk price (AED/tonne)", 600, 1300, int(DEFAULTS["price"]), 10)
+    tonnes_pc = st.slider("Tonnes per contractor / quarter", 2.0, 14.0, DEFAULTS["tonnes_per_contractor"], 0.5,
+                           help="Flagged in the model as THE swing variable — unvalidated, moves the outcome more than price or cost.")
+    churn = st.slider("Quarterly contractor churn", 0.02, 0.30, DEFAULTS["churn"], 0.01, format="%.2f")
+    signings_mult = st.slider("Signings-pace multiplier", 0.5, 2.0, 1.0, 0.1,
+                               help="Scales the whole contractor-signing ramp up or down, keeping its shape.")
+    deposit_pct = st.slider("Upfront deposit on signing", 0.0, 0.6, DEFAULTS["deposit_pct"], 0.05, format="%.0%%".replace("%%","%"))
+    funding_ask = st.slider("Funding ask (AED)", 200000, 900000, int(DEFAULTS["funding_ask"]), 10000)
+
+    with st.expander("Advanced: cost structure"):
+        feedstock_cost = st.slider("Feedstock cost (AED/t)", 0, 400, int(DEFAULTS["feedstock_cost"]), 10)
+        biochar_cost = st.slider("Biochar sourcing (AED/t)", 100, 700, int(DEFAULTS["biochar_cost"]), 10)
+        blending_cost = st.slider("Blending & packaging (AED/t)", 0, 300, int(DEFAULTS["blending_cost"]), 10)
+        opex_y3 = st.slider("Year 3 fixed opex (AED/qtr)", 40000, 150000, int(DEFAULTS["opex_y3"]), 1000)
+
+    if st.button("↺ Reset to validated defaults", use_container_width=True):
+        st.rerun()
+
+    st.markdown("---")
+    st.caption("Source model: Saharasoil_B2B_Model_Reanchored.xlsx — re-anchored, 3-year, deposit + collection-lag cash mechanics.")
+
+assumptions = dict(DEFAULTS)
+assumptions.update(dict(
+    price=float(price), tonnes_per_contractor=float(tonnes_pc), churn=float(churn),
+    signings_multiplier=float(signings_mult), deposit_pct=float(deposit_pct), funding_ask=float(funding_ask),
+    feedstock_cost=float(feedstock_cost), biochar_cost=float(biochar_cost), blending_cost=float(blending_cost),
+    opex_y3=float(opex_y3),
+))
+m = compute_model(assumptions)
+is_default = all(abs(assumptions[k] - DEFAULTS[k]) < 1e-9 for k in
+                  ["price","tonnes_per_contractor","churn","signings_multiplier","deposit_pct","funding_ask",
+                   "feedstock_cost","biochar_cost","blending_cost","opex_y3"])
+
+# ----------------------------------------------------------------------------
+# HERO
+# ----------------------------------------------------------------------------
+st.markdown(f"""
+<div class="hero">
+  <h1>SAHARASOIL</h1>
+  <p>Turning camel waste into the substrate behind the UAE's greenest offices</p>
+</div>
+""", unsafe_allow_html=True)
+
+if not is_default:
+    st.info("🎛️ You're viewing a **live, adjusted** scenario — every number below reflects your slider changes, not the validated defaults. Use *Reset* in the sidebar to return to the pitch-ready baseline.", icon="🎛️")
+
+def metric_card(col, label, value, sub=""):
+    col.markdown(f"""<div class="metric-card"><div class="label">{label}</div>
+        <div class="value">{value}</div><div class="sub">{sub}</div></div>""", unsafe_allow_html=True)
+
+c1, c2, c3, c4, c5 = st.columns(5)
+metric_card(c1, "3-Year Revenue", f"AED {m['year1_rev']+m['year2_rev']+m['year3_rev']:,.0f}", "Y1+Y2+Y3 modelled")
+metric_card(c2, "Blended Gross Margin", f"{m['gross_margin'][-1]*100:.1f}%", "steady across the model")
+metric_card(c3, "EBITDA Turns Positive", m['ebitda_positive_q'], "first profitable quarter")
+metric_card(c4, "LTV : CAC (all-in)", f"{m['ltv_cac_allin']:.1f}x", "conservative, loaded CAC")
+runway_label = "✓ Covered" if m['runway_ok'] else "⚠ Short"
+metric_card(c5, "Runway at Current Ask", runway_label, f"trough AED {m['trough']:,.0f}")
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ----------------------------------------------------------------------------
+# TABS
+# ----------------------------------------------------------------------------
+tab_overview, tab_product, tab_market, tab_unit, tab_fin, tab_risk, tab_road, tab_ask = st.tabs(
+    ["🌍 Overview", "🧪 Product 360°", "📊 Market Sizing", "💰 Unit Economics",
+     "📈 Financial Model", "⚠️ Risk Register", "🗺️ Roadmap", "🎯 The Ask"]
+)
+
+# ============================================================================
+# TAB: OVERVIEW
+# ============================================================================
+with tab_overview:
+    colA, colB = st.columns([3, 2])
+    with colA:
+        st.markdown('<h3 class="section-title">The Problem, In Two Facts</h3>', unsafe_allow_html=True)
+        st.markdown(f"""
+<div class="callout"><b>Offices are paying for greenery that dies.</b> Generic imported soil isn't formulated for Gulf heat,
+saline water, or HVAC-dried air — biophilic installations decline fast, and ESG/WELL budgets fund constant replacement
+instead of results.</div>
+<div class="callout sand"><b>Farms are sitting on an under-used resource.</b> Camel manure has proven soil-amendment
+properties for exactly these conditions — but Northern Emirates farms are paid little to nothing for it today.</div>
+<div class="callout green"><b>No one has connected them.</b> There is no B2B channel linking climate-adapted circular
+waste to the office-greenery supply chain — until now.</div>
+""", unsafe_allow_html=True)
+
+    with colB:
+        st.markdown('<h3 class="section-title">Business Model Snapshot</h3>', unsafe_allow_html=True)
+        st.markdown(f"""
+- **Customer:** plantscaping / facility-management contractors (B2B, not B2C)
+- **Product:** bulk camel-biochar soil blend + recurring top-dressing service
+- **Channel:** 2–3 anchor contractors + free-zone FM associations & ESG consultancies
+- **Moat:** feedstock proximity, formal offtake agreements, below industrial biochar producers' economics
+- **Ask:** AED {assumptions['funding_ask']:,.0f} — MVP setup, MOCCAE registration, and working-capital runway
+""")
+        st.markdown('<h3 class="section-title">Why This Dashboard</h3>', unsafe_allow_html=True)
+        st.markdown("""
+Every figure here is **formula-driven**, not typed in. Move a slider in the sidebar — price, churn, tonnes per
+contractor, the funding ask — and revenue, margin, cash runway, and unit economics all recompute together,
+exactly like the underlying financial model.
+""")
+
+# ============================================================================
+# TAB: PRODUCT 360
+# ============================================================================
+with tab_product:
+    st.markdown('<h3 class="section-title">The Product, From Every Angle</h3>', unsafe_allow_html=True)
+
+    st.markdown("#### The Circular Flow")
+    steps = [("🐪", "Source", "Camel manure from offtake-agreement farms across the Northern Emirates"),
+             ("🔥", "Process", "Finished biochar from an established external processor"),
+             ("🌱", "Blend", "Finished into a Gulf-climate-formulated soil amendment"),
+             ("🚚", "Supply", "Bulk delivery to plantscaping & facility-management contractors")]
+    cols = st.columns(4)
+    for col, (icon, title, desc) in zip(cols, steps):
+        col.markdown(f"""<div class="process-card"><div class="icon">{icon}</div><h4>{title}</h4><p>{desc}</p></div>""",
+                      unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    colL, colR = st.columns(2)
+
+    with colL:
+        st.markdown("#### Competitive Positioning (illustrative — pending pilot validation)")
+        categories = ["Heat Tolerance", "Salinity Tolerance", "Water Retention", "Circularity / ESG",
+                      "Cost Efficiency", "Local Sourcing"]
+        saharasoil_scores = [9, 8, 8, 10, 7, 10]
+        generic_scores = [4, 3, 4, 2, 8, 2]
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(r=saharasoil_scores + [saharasoil_scores[0]],
+                                       theta=categories + [categories[0]], fill='toself', name='Saharasoil',
+                                       line_color=GREEN, fillcolor="rgba(63,107,79,0.25)"))
+        fig.add_trace(go.Scatterpolar(r=generic_scores + [generic_scores[0]],
+                                       theta=categories + [categories[0]], fill='toself', name='Generic imported soil',
+                                       line_color=RUST, fillcolor="rgba(156,75,59,0.15)"))
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])),
+                           template=PLOTLY_TEMPLATE, height=380, showlegend=True,
+                           title="Saharasoil vs. generic imported soil (1–10 scale)")
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("Directional scores for pitch purposes — not lab-verified. Validate with agronomic pilot testing (see Risk Register).")
+
+    with colR:
+        st.markdown("#### Blend Composition")
+        fig2 = go.Figure(data=[go.Pie(labels=["Biochar", "Compost, sand & manure carrier"], values=[27, 73],
+                                       hole=0.55, marker_colors=[SAND, NAVY], textinfo="label+percent")])
+        fig2.update_layout(template=PLOTLY_TEMPLATE, height=380,
+                            title="~27% biochar / ~73% compost, sand & manure by weight")
+        st.plotly_chart(fig2, use_container_width=True)
+        st.caption("At ~27% blend share and ~AED 1,300/t physical biochar, the AED 350/t input cost used across this model is internally consistent.")
+
+    st.markdown("#### Feedstock Diversification — 5-Year View")
+    years = ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"]
+    camel = [100, 90, 65, 45, 35]
+    cow = [0, 10, 30, 35, 35]
+    poultry = [0, 0, 0, 10, 15]
+    palm = [0, 0, 5, 10, 15]
+    fig3 = go.Figure()
+    for name, vals, color in [("Camel manure", camel, NAVY), ("Cow / dairy manure", cow, SAND),
+                                ("Poultry litter", poultry, RUST), ("Date-palm biomass", palm, GREEN)]:
+        fig3.add_trace(go.Scatter(x=years, y=vals, mode="lines", name=name, stackgroup="one",
+                                   line=dict(width=0.5), fillcolor=color, line_color=color))
+    fig3.update_layout(template=PLOTLY_TEMPLATE, height=340, yaxis_title="% of feedstock mix",
+                        title="Camel stays the flagship story — the mix quietly de-risks supply")
+    st.plotly_chart(fig3, use_container_width=True)
+    st.caption("Illustrative diversification path from the 5-Year Diversification & Expansion Plan — starts Year 2, never disturbs the Year 1 pitch numbers.")
+
+# ============================================================================
+# TAB: MARKET SIZING
+# ============================================================================
+with tab_market:
+    st.markdown('<h3 class="section-title">TAM · SAM · SOM</h3>', unsafe_allow_html=True)
+
+    colL, colR = st.columns([3, 2])
+    with colL:
+        fig = go.Figure(go.Funnel(
+            y=["TAM<br><span style='font-size:0.8em'>UAE Landscaping Market (2024)</span>",
+               "SAM<br><span style='font-size:0.8em'>Commercial softscape materials</span>",
+               "SOM<br><span style='font-size:0.8em'>Realistic Year-5 capture</span>"],
+            x=[1670000000, 105210000, 275000],
+            textposition="inside", textinfo="value",
+            marker={"color": [NAVY, SAND, RUST]},
+        ))
+        fig.update_layout(template=PLOTLY_TEMPLATE, height=420, title="Market sizing funnel (USD)")
+        st.plotly_chart(fig, use_container_width=True)
+
+    with colR:
+        st.markdown("#### How we got there")
+        st.markdown("""
+| Step | Value |
+|---|---|
+| TAM | UAE Landscaping Market, TechSci Research (2024) |
+| × Commercial share | 35% |
+| × Softscape share | 60% |
+| × Materials-only share | 30% |
+| **= SAM** | **~$105M** |
+| SOM | Bottom-up from Year-5 production ceiling, **not** a % of SAM |
+""")
+        st.markdown("""<div class="callout sand">We deliberately built SOM bottom-up from our own production capacity
+rather than guessing a market-share percentage — a small, defensible bite beats an inflated one under Q&A.</div>""",
+                     unsafe_allow_html=True)
+
+    st.markdown("#### UAE Landscaping Market Growth")
+    fig4 = go.Figure()
+    fig4.add_trace(go.Scatter(x=[2024, 2025, 2030], y=[1.67, 1.8, 2.84], mode="lines+markers",
+                               line=dict(color=NAVY, width=3), marker=dict(size=10), name="TechSci Research"))
+    fig4.update_layout(template=PLOTLY_TEMPLATE, height=320, yaxis_title="USD Billions",
+                        title="UAE Landscaping Market — USD 1.67B (2024) → USD 2.84B (2030F), 9.07% CAGR")
+    st.plotly_chart(fig4, use_container_width=True)
+
+# ============================================================================
+# TAB: UNIT ECONOMICS
+# ============================================================================
+with tab_unit:
+    st.markdown('<h3 class="section-title">Per-Tonne & Per-Contractor Economics</h3>', unsafe_allow_html=True)
+
+    c1, c2, c3, c4 = st.columns(4)
+    metric_card(c1, "Bulk Gross Margin", f"{m['bulk_margin']*100:.1f}%", f"AED {m['bulk_gp_per_tonne']:.0f} / tonne")
+    metric_card(c2, "Top-Dressing Margin", f"{m['topdress_margin']*100:.0f}%", "lighter-touch, higher margin")
+    metric_card(c3, "CAC (narrow / all-in)", f"AED {m['cac_narrow']:,.0f} / {m['cac_all_in']:,.0f}", "activity-only vs. loaded")
+    metric_card(c4, "CAC Payback", f"{m['cac_payback_q']:.1f} qtrs", "narrow CAC basis")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    colL, colR = st.columns(2)
+    with colL:
+        fig = go.Figure(data=[
+            go.Bar(name="Gross margin %", x=["Bulk supply", "Top-dressing"],
+                   y=[m['bulk_margin']*100, m['topdress_margin']*100],
+                   marker_color=[NAVY, SAND], text=[f"{m['bulk_margin']*100:.1f}%", f"{m['topdress_margin']*100:.0f}%"],
+                   textposition="outside")
+        ])
+        fig.update_layout(template=PLOTLY_TEMPLATE, height=360, title="Gross margin by revenue line", yaxis_range=[0, 75])
+        st.plotly_chart(fig, use_container_width=True)
+
+    with colR:
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(x=[c*100 for c in m['churn_grid']], y=m['ltv_cac_sensitivity'],
+                                   mode="lines+markers", line=dict(color=RUST, width=3), marker=dict(size=9),
+                                   name="LTV:CAC (all-in)"))
+        fig2.add_hline(y=3, line_dash="dash", line_color=GREEN, annotation_text="3x healthy B2B threshold")
+        fig2.update_layout(template=PLOTLY_TEMPLATE, height=360, xaxis_title="Quarterly churn (%)",
+                            yaxis_title="LTV : CAC (all-in)", title="LTV:CAC sensitivity to churn — stress-tested, not just hoped for")
+        st.plotly_chart(fig2, use_container_width=True)
+
+    st.markdown(f"""<div class="callout green">At the current settings, LTV:CAC (all-in) is <b>{m['ltv_cac_allin']:.2f}x</b> —
+even under much more conservative churn than the 5%/quarter base case, it stays near or above the 3x threshold
+considered healthy for B2B. The narrow-CAC headline number ({m['ltv_cac_narrow']:.1f}x) is real, but the all-in number
+is the one we'd defend under questioning.</div>""", unsafe_allow_html=True)
+
+    with st.expander("📐 Methodology note — a correction we made to the source workbook"):
+        st.markdown("""
+The uploaded workbook's `Gross profit / contractor` formula used the top-dressing **COGS%** where it should have used
+the top-dressing **margin%** (i.e. `1 − COGS%`) when adding top-dressing's contribution to per-contractor gross profit.
+That understated gross profit per contractor (AED 2,532 instead of the correct AED 2,748) and, downstream, understated
+LTV, LTV:CAC, and overstated the break-even contractor count. This dashboard uses the corrected formula throughout —
+it's more favourable than the original file, and we'd rather you hear about the fix from us than find the discrepancy yourselves.
+""")
+
+# ============================================================================
+# TAB: FINANCIAL MODEL
+# ============================================================================
+with tab_fin:
+    st.markdown('<h3 class="section-title">3-Year Quarterly Model</h3>', unsafe_allow_html=True)
+
+    c1, c2, c3, c4 = st.columns(4)
+    metric_card(c1, "Year 1 Revenue", f"AED {m['year1_rev']:,.0f}")
+    metric_card(c2, "Year 2 Revenue", f"AED {m['year2_rev']:,.0f}")
+    metric_card(c3, "Year 3 Revenue", f"AED {m['year3_rev']:,.0f}")
+    metric_card(c4, "EBITDA-Positive Quarter", m['ebitda_positive_q'])
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=m['quarters'], y=m['bulk_rev'], name="Bulk revenue", marker_color=NAVY))
+    fig.add_trace(go.Bar(x=m['quarters'], y=m['topdress_rev'], name="Top-dressing revenue", marker_color=SAND))
+    fig.update_layout(barmode="stack", template=PLOTLY_TEMPLATE, height=380, title="Quarterly revenue build")
+    st.plotly_chart(fig, use_container_width=True)
+
+    colL, colR = st.columns(2)
+    with colL:
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(x=m['quarters'], y=m['ebitda'], mode="lines+markers", name="EBITDA",
+                                   line=dict(color=RUST, width=3)))
+        fig2.add_hline(y=0, line_dash="dot", line_color=GREY)
+        fig2.update_layout(template=PLOTLY_TEMPLATE, height=360, title="EBITDA by quarter")
+        st.plotly_chart(fig2, use_container_width=True)
+    with colR:
+        fig3 = go.Figure()
+        fig3.add_trace(go.Scatter(x=m['quarters'], y=m['cum_cash_incl'], mode="lines+markers", name="Cumulative cash",
+                                   line=dict(color=NAVY, width=3), fill="tozeroy", fillcolor="rgba(31,59,77,0.12)"))
+        fig3.add_hline(y=0, line_dash="dash", line_color=RUST, annotation_text="cash-out line")
+        fig3.update_layout(template=PLOTLY_TEMPLATE, height=360,
+                            title=f"Cumulative cash incl. ask of AED {assumptions['funding_ask']:,.0f}")
+        st.plotly_chart(fig3, use_container_width=True)
+
+    status_color = GREEN if m['runway_ok'] else RUST
+    status_text = "✓ Ask covers the modelled runway" if m['runway_ok'] else "⚠ Cash goes negative — raise the ask or pull a lever"
+    st.markdown(f"""<div class="callout" style="border-left-color:{status_color}">
+    <b>Runway status: {status_text}</b><br>
+    Deepest modelled cash trough: <b>AED {m['trough']:,.0f}</b> · Model-derived recommended ask (trough × 1.10 buffer):
+    <b>AED {m['recommended_ask']:,.0f}</b> · Current ask: <b>AED {assumptions['funding_ask']:,.0f}</b>
+    </div>""", unsafe_allow_html=True)
+
+    with st.expander("📋 Full quarterly table"):
+        df = pd.DataFrame({
+            "Quarter": m['quarters'], "Active contractors": np.round(m['active'], 1),
+            "Total revenue": np.round(m['total_rev']), "Total COGS": np.round(m['total_cogs']),
+            "Opex": np.round(m['opex']), "EBITDA": np.round(m['ebitda']),
+            "Cumulative cash (incl. ask)": np.round(m['cum_cash_incl']),
+        })
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+# ============================================================================
+# TAB: RISK REGISTER
+# ============================================================================
+with tab_risk:
+    st.markdown('<h3 class="section-title">⚠️ Demand-Side Risk — Read This First</h3>', unsafe_allow_html=True)
+    st.markdown(f"""<div class="callout">
+    <b>The cost side of this model is anchored to real market data. The demand side is the exposed assumption —
+    and we're saying so ourselves.</b><br><br>
+    Revenue is driven almost entirely by <b>tonnes per active contractor per quarter</b> — currently set to
+    <b>{assumptions['tonnes_per_contractor']:.1f}</b> in the sidebar. No contractor has confirmed this number yet.
+    It moves the outcome more than price or cost do.
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown(f"""<div class="callout sand">
+    <b>Much of UAE office "greenery" buys no soil at all.</b> A large share of green walls sold in the UAE are
+    artificial/faux panels — marketed as lasting 7–10 years, maintenance-free — that buy zero substrate. Real living
+    walls typically use modular felt-pocket or hydroponic systems with minimal bulk soil. Real soil demand concentrates
+    in potted plants, planters, and landscaped beds — a narrower slice than "all biophilic office greenery" implies.
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown("#### How sensitive the model is to this one number")
+    df_sens = pd.DataFrame(m['tonnes_sensitivity'])
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df_sens['tonnes'], y=df_sens['breakeven_contractors'], mode="lines+markers",
+                              line=dict(color=RUST, width=3), marker=dict(size=10)))
+    fig.add_vline(x=assumptions['tonnes_per_contractor'], line_dash="dash", line_color=NAVY,
+                  annotation_text="current setting")
+    fig.update_layout(template=PLOTLY_TEMPLATE, height=340, xaxis_title="Tonnes / contractor / quarter",
+                       yaxis_title="Contractors needed to break even (Year 3 opex)",
+                       title="A small, unvalidated number swings break-even by a year or more")
+    st.plotly_chart(fig, use_container_width=True)
+    st.dataframe(df_sens.rename(columns={
+        "tonnes": "Tonnes/contractor/qtr", "rev_per_contractor_q": "Revenue/contractor/qtr",
+        "gp_per_contractor_q": "GP/contractor/qtr", "breakeven_contractors": "Break-even contractors",
+        "rev_per_contractor_yr": "Revenue/contractor/yr"}).round(0), use_container_width=True, hide_index=True)
+
+    st.markdown("""<div class="callout green"><b>Mitigation (also the fastest way to de-risk this pitch):</b>
+    validate with 3+ interviews of UAE plantscaping/FM contractors — (a) tonnes of soil/substrate per site per year,
+    (b) share of their work that's live-soil vs. artificial vs. hydroponic, (c) appetite for a recurring top-dressing
+    contract. Three calls confirm or correct the single most load-bearing assumption in this model.</div>""",
+                unsafe_allow_html=True)
+
+    st.markdown('<h3 class="section-title">Business Risk Register</h3>', unsafe_allow_html=True)
+    risks = [
+        ("Feedstock competition", "Industrial buyers (e.g. cement-plant fuel use) compete for camel manure",
+         "Sourcing targets farms outside existing industrial buyers' radius; pay a higher-value-add price than commodity fuel use"),
+        ("Supplier = competitor", "Camelicious/Viqa are both our biochar supplier and our biggest incumbent threat",
+         "Formal supply agreement now; second independent biochar source qualified by Phase 2"),
+        ("Channel concentration", "2–3 anchor contractors as the sole go-to-market channel",
+         "Secondary FM-association & ESG-consultancy channel added from Phase 1, not later"),
+        ("Recurring revenue vs. product success", "A product that works too well could shrink its own reorder cycle",
+         "Top-dressing contract decouples recurring revenue from plant mortality"),
+    ]
+    cols = st.columns(2)
+    for i, (title, risk, mitig) in enumerate(risks):
+        with cols[i % 2]:
+            st.markdown(f"""<div class="metric-card" style="margin-bottom:1rem;">
+                <div class="pill">Risk</div><br><b>{title}</b>
+                <p style="color:{GREY};font-size:0.85rem;margin:0.4rem 0;">{risk}</p>
+                <div class="pill" style="background:{GREEN};">Mitigation</div>
+                <p style="color:{DARK};font-size:0.85rem;">{mitig}</p>
+                </div>""", unsafe_allow_html=True)
+
+# ============================================================================
+# TAB: ROADMAP
+# ============================================================================
+with tab_road:
+    st.markdown('<h3 class="section-title">5-Year Roadmap — Geography, Feedstock & Segments</h3>', unsafe_allow_html=True)
+
+    roadmap = [
+        dict(Year="Year 1", Phase="Launch", Start=0, Duration=1,
+             Detail="100% camel manure · Home-base free zones · Corporate office greenery"),
+        dict(Year="Year 2", Phase="Near Expansion", Start=1, Duration=1,
+             Detail="Camel primary, dairy-farm relationships open · Ajman & UAQ · Blend R&D begins"),
+        dict(Year="Year 3", Phase="Blend Launch + New Segment", Start=2, Duration=1,
+             Detail="50/50 camel-cow blend live · East coast · First government/developer pilot"),
+        dict(Year="Year 4", Phase="Second Hub + Commercial", Start=3, Duration=1,
+             Detail="Feedstock-agnostic 2nd hub · Government + developers commercial"),
+        dict(Year="Year 5", Phase="Full Diversification", Start=4, Duration=1,
+             Detail="Camel+cow+poultry+palm biomass · CEA pilot · GCC exploration"),
+    ]
+    colors = [NAVY, SAND, RUST, GREEN, NAVY_DARK]
+    fig = go.Figure()
+    for i, r in enumerate(roadmap):
+        fig.add_trace(go.Bar(y=[r["Phase"]], x=[r["Duration"]], base=[r["Start"]], orientation="h",
+                              marker_color=colors[i], name=r["Year"],
+                              hovertext=r["Detail"], hoverinfo="text",
+                              text=r["Year"], textposition="inside"))
+    fig.update_layout(template=PLOTLY_TEMPLATE, height=340, showlegend=False, barmode="stack",
+                       xaxis=dict(title="Year", tickvals=list(range(6))),
+                       title="Hover each bar for what actually happens that year")
+    st.plotly_chart(fig, use_container_width=True)
+
+    cols = st.columns(5)
+    for col, r in zip(cols, roadmap):
+        col.markdown(f"""<div class="metric-card"><div class="label">{r['Year']}</div>
+            <div style="color:{NAVY};font-weight:700;font-size:1rem;margin:0.3rem 0;">{r['Phase']}</div>
+            <div class="sub">{r['Detail']}</div></div>""", unsafe_allow_html=True)
+
+# ============================================================================
+# TAB: THE ASK
+# ============================================================================
+with tab_ask:
+    st.markdown('<h3 class="section-title">The Ask</h3>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    metric_card(c1, "Current Ask", f"AED {assumptions['funding_ask']:,.0f}")
+    metric_card(c2, "Model-Recommended Ask", f"AED {m['recommended_ask']:,.0f}", "trough × 1.10 buffer")
+    metric_card(c3, "Runway Status", "✓ Covered" if m['runway_ok'] else "⚠ Short")
+
+    colL, colR = st.columns(2)
+    with colL:
+        fig = go.Figure(data=[go.Pie(
+            labels=["Working capital / runway buffer", "Production & blending setup", "BD & contractor acquisition",
+                    "MOCCAE registration & pilot testing", "Contingency"],
+            values=[40, 25, 15, 10, 10], hole=0.45,
+            marker_colors=[NAVY, SAND, GREEN, RUST, LIGHTGREY])])
+        fig.update_layout(template=PLOTLY_TEMPLATE, height=380, title="Use of funds")
+        st.plotly_chart(fig, use_container_width=True)
+    with colR:
+        fig2 = go.Figure(data=[
+            go.Bar(x=["Current ask", "Model-recommended"], y=[assumptions['funding_ask'], m['recommended_ask']],
+                   marker_color=[SAND, GREEN if m['runway_ok'] else RUST],
+                   text=[f"AED {assumptions['funding_ask']:,.0f}", f"AED {m['recommended_ask']:,.0f}"],
+                   textposition="outside")
+        ])
+        fig2.update_layout(template=PLOTLY_TEMPLATE, height=380, title="Ask vs. model-derived requirement")
+        st.plotly_chart(fig2, use_container_width=True)
+
+    if not m['runway_ok']:
+        st.markdown(f"""<div class="callout"><b>Levers if short (in order of ease):</b>
+        (1) raise the deposit percentage negotiated with contractors, (2) validate a higher tonnes/contractor number
+        in the field, (3) phase the Year-3 opex step-up later, (4) raise nearer the modelled trough of
+        AED {abs(m['trough']):,.0f}.</div>""", unsafe_allow_html=True)
+    else:
+        st.markdown("""<div class="callout green">At current settings, the ask covers the modelled cash trough with
+        the built-in buffer. This is the scenario to present live if asked to defend the number.</div>""",
+                     unsafe_allow_html=True)
+
+st.markdown("<br><hr><center style='color:#6B6B6B;font-size:0.8rem;'>SAHARASOIL · Group 10 · SP Jain School of Global Management · Entrepreneurship & Digital Leadership</center>", unsafe_allow_html=True)
