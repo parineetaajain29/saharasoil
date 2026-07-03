@@ -78,9 +78,16 @@ section[data-testid="stSidebar"] hr {{ border-color: rgba(250,246,236,0.18) !imp
     padding: 2.4rem 2.6rem; border-radius: 6px; color: white; margin-bottom: 1.2rem;
     border: 1px solid rgba(250,246,236,0.1);
 }}
-.hero, .hero * {{ color: {BONE} !important; }}
-.hero h1 {{ color: {BONE} !important; font-size: 2.7rem; margin-bottom: 0.2rem; font-family: 'Fraunces', serif !important; }}
-.hero p {{ color: #d69a6e !important; font-size: 1.1rem; font-style: italic; margin: 0; }}
+/* High-specificity overrides: the generic "force dark text" rule above targets
+   `section[data-testid="stMain"] div[data-testid="stMarkdownContainer"] *`, which is specific
+   enough to beat a plain `.hero *` rule even with !important. These match that same prefix
+   chain plus the .hero class, so they win instead. */
+section[data-testid="stMain"] div[data-testid="stMarkdownContainer"] .hero,
+section[data-testid="stMain"] div[data-testid="stMarkdownContainer"] .hero * {{ color: {BONE} !important; }}
+section[data-testid="stMain"] div[data-testid="stMarkdownContainer"] .hero h1 {{
+    color: {BONE} !important; font-size: 2.7rem; margin-bottom: 0.2rem; font-family: 'Fraunces', serif !important; }}
+section[data-testid="stMain"] div[data-testid="stMarkdownContainer"] .hero p {{
+    color: #d69a6e !important; font-size: 1.1rem; font-style: italic; margin: 0; }}
 
 .metric-card {{
     background: {BONE}; border-radius: 3px; padding: 1.1rem 1.3rem; border: 1px solid {LINE};
@@ -103,9 +110,11 @@ section[data-testid="stSidebar"] hr {{ border-color: rgba(250,246,236,0.18) !imp
     font-family: 'Fraunces', serif !important; }}
 
 
-.pill, .pill * {{ display:inline-block; background:{BIOCHAR}; color:{BONE} !important; padding: 0.15rem 0.7rem; border-radius: 2px;
+.pill {{ display:inline-block; background:{BIOCHAR}; padding: 0.15rem 0.7rem; border-radius: 2px;
          font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em;
          text-transform: uppercase; margin-bottom: 0.4rem;}}
+section[data-testid="stMain"] div[data-testid="stMarkdownContainer"] .pill,
+section[data-testid="stMain"] div[data-testid="stMarkdownContainer"] .pill * {{ color: {BONE} !important; }}
 
 .process-card {{ background: {BONE}; border-radius: 3px; padding: 1.2rem; text-align: center;
                   border: 1px solid {LINE}; border-top: 3px solid {SIENNA}; height: 100%;}}
