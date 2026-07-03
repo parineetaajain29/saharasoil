@@ -11,27 +11,36 @@ from model_engine import compute_model, DEFAULTS, QUARTER_LABELS
 st.set_page_config(page_title="Saharasoil — 360 Investor Dashboard", page_icon="🌱",
                     layout="wide", initial_sidebar_state="expanded")
 
-NAVY = "#1F3B4D"
-NAVY_DARK = "#162A37"
-SAND = "#C9A15A"
-RUST = "#9C4B3B"
-GREEN = "#3F6B4F"
-CREAM = "#F7F4EF"
-DARK = "#222222"
-GREY = "#6B6B6B"
-LIGHTGREY = "#E7E2D8"
+BIOCHAR = "#1a1510"
+BIOCHAR_2 = "#241d16"
+SIENNA = "#a0472a"
+SIENNA_DARK = "#7c3720"
+GREEN = "#5b7247"
+GREEN_DARK = "#3e4e32"
+SAND = "#e7d9bd"
+SAND_2 = "#ddccab"
+BONE = "#faf6ec"
+INK = "#241c14"
+INK_SOFT = "#584b3a"
+LINE = "rgba(36,28,20,0.14)"
 
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 html, body, [class*="css"]  {{ font-family: 'Inter', sans-serif; }}
-h1, h2, h3 {{ font-family: 'Playfair Display', serif !important; color: {NAVY}; }}
+h1, h2, h3 {{ font-family: 'Fraunces', serif !important; font-weight: 600; letter-spacing: -0.01em; color: {BIOCHAR}; }}
 
-.stApp {{ background-color: {CREAM}; }}
+.mono-tag {{
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: 0.08em; color: {SIENNA_DARK}; display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}}
+.mono-tag::before {{ content: ""; width: 20px; height: 1px; background: {SIENNA_DARK}; }}
+
+.stApp {{ background-color: {SAND}; }}
 
 /* --- MAIN CONTENT: force dark text so nothing is white-on-light regardless of Streamlit theme --- */
-section[data-testid="stMain"] {{ color: {DARK}; }}
+section[data-testid="stMain"] {{ color: {INK}; }}
 section[data-testid="stMain"] p,
 section[data-testid="stMain"] li,
 section[data-testid="stMain"] span,
@@ -39,55 +48,86 @@ section[data-testid="stMain"] label,
 section[data-testid="stMain"] td,
 section[data-testid="stMain"] th,
 section[data-testid="stMain"] div[data-testid="stMarkdownContainer"],
-section[data-testid="stMain"] div[data-testid="stMarkdownContainer"] * {{ color: {DARK} !important; }}
+section[data-testid="stMain"] div[data-testid="stMarkdownContainer"] * {{ color: {INK} !important; }}
 section[data-testid="stMain"] h1,
 section[data-testid="stMain"] h2,
 section[data-testid="stMain"] h3,
-section[data-testid="stMain"] h4 {{ color: {NAVY} !important; }}
-/* tab labels */
-button[data-testid="stTab"] p, div[data-testid="stTabs"] button p {{ color: {NAVY} !important; }}
+section[data-testid="stMain"] h4 {{ color: {BIOCHAR} !important; font-family: 'Fraunces', serif !important; }}
+/* tab labels — mono tracked caps, like the site's nav links */
+button[data-testid="stTab"] p, div[data-testid="stTabs"] button p {{
+    color: {INK_SOFT} !important; font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 0.76rem !important; text-transform: uppercase; letter-spacing: 0.06em;
+}}
+div[data-testid="stTabs"] button[aria-selected="true"] p {{ color: {SIENNA_DARK} !important; font-weight: 600 !important; }}
 /* metric-card / callout inner text keeps its own colours (set below) */
-.metric-card .value {{ color: {NAVY} !important; }}
-.metric-card .label, .metric-card .sub {{ color: {GREY} !important; }}
+.metric-card .value {{ color: {BIOCHAR} !important; }}
+.metric-card .label, .metric-card .sub {{ color: {INK_SOFT} !important; }}
 
-/* --- SIDEBAR: dark navy background with light text --- */
-section[data-testid="stSidebar"] {{ background-color: {NAVY}; }}
-section[data-testid="stSidebar"] * {{ color: {CREAM} !important; }}
-section[data-testid="stSidebar"] .stSlider label, section[data-testid="stSidebar"] label {{ color: {SAND} !important; font-weight: 600; }}
+/* --- SIDEBAR: biochar-dark background with sand text --- */
+section[data-testid="stSidebar"] {{ background-color: {BIOCHAR}; }}
+section[data-testid="stSidebar"] * {{ color: {SAND} !important; }}
+section[data-testid="stSidebar"] .stSlider label, section[data-testid="stSidebar"] label {{
+    color: {SAND_2} !important; font-weight: 500; font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 0.74rem !important; text-transform: uppercase; letter-spacing: 0.04em;
+}}
+section[data-testid="stSidebar"] h2 {{ color: {BONE} !important; font-family: 'Fraunces', serif !important; }}
+section[data-testid="stSidebar"] hr {{ border-color: rgba(250,246,236,0.18) !important; }}
 
 .hero {{
-    background: linear-gradient(135deg, {NAVY} 0%, {NAVY_DARK} 100%);
-    padding: 2.2rem 2.5rem; border-radius: 14px; color: white; margin-bottom: 1.2rem;
+    background: linear-gradient(135deg, {BIOCHAR} 0%, {BIOCHAR_2} 100%);
+    padding: 2.4rem 2.6rem; border-radius: 6px; color: white; margin-bottom: 1.2rem;
+    border: 1px solid rgba(250,246,236,0.1);
 }}
-.hero, .hero * {{ color: white !important; }}
-.hero h1 {{ color: white !important; font-size: 2.6rem; margin-bottom: 0.2rem; }}
-.hero p {{ color: {SAND} !important; font-size: 1.15rem; font-style: italic; margin: 0; }}
+.hero, .hero * {{ color: {BONE} !important; }}
+.hero h1 {{ color: {BONE} !important; font-size: 2.7rem; margin-bottom: 0.2rem; font-family: 'Fraunces', serif !important; }}
+.hero p {{ color: #d69a6e !important; font-size: 1.1rem; font-style: italic; margin: 0; }}
 
 .metric-card {{
-    background: white; border-radius: 12px; padding: 1.1rem 1.3rem; border-left: 5px solid {SAND};
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06); height: 100%;
+    background: {BONE}; border-radius: 3px; padding: 1.1rem 1.3rem; border: 1px solid {LINE};
+    border-left: 3px solid {SIENNA}; height: 100%;
 }}
-.metric-card .label {{ color: {GREY}; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }}
-.metric-card .value {{ color: {NAVY}; font-size: 1.7rem; font-weight: 800; font-family: 'Playfair Display', serif; }}
-.metric-card .sub {{ color: {GREY}; font-size: 0.82rem; }}
+.metric-card .label {{ color: {INK_SOFT}; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
+    font-weight: 600; font-family: 'IBM Plex Mono', monospace; }}
+.metric-card .value {{ color: {BIOCHAR}; font-size: 1.7rem; font-weight: 600; font-family: 'Fraunces', serif; }}
+.metric-card .sub {{ color: {INK_SOFT}; font-size: 0.82rem; }}
 
 .callout {{
-    background: {CREAM}; border-left: 5px solid {RUST}; border-radius: 8px; padding: 1rem 1.3rem; margin: 0.8rem 0;
+    background: {BONE}; border: 1px solid {LINE}; border-left: 3px solid {SIENNA_DARK};
+    border-radius: 3px; padding: 1rem 1.3rem; margin: 0.8rem 0;
 }}
 .callout.green {{ border-left-color: {GREEN}; }}
-.callout.sand {{ border-left-color: {SAND}; }}
-.callout b {{ color: {NAVY}; }}
+.callout.sand {{ border-left-color: {SIENNA}; }}
+.callout b {{ color: {BIOCHAR}; }}
 
-.section-title {{ color: {NAVY}; border-bottom: 3px solid {SAND}; padding-bottom: 0.3rem; margin-top: 0.5rem; }}
+.section-title {{ color: {BIOCHAR}; border-bottom: none; padding-bottom: 0; margin-top: 0.2rem;
+    font-family: 'Fraunces', serif !important; }}
 
-.pill, .pill * {{ display:inline-block; background:{NAVY}; color:white !important; padding: 0.15rem 0.7rem; border-radius: 999px;
-         font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.4rem;}}
 
-.process-card {{ background: white; border-radius: 14px; padding: 1.2rem; text-align: center;
-                  box-shadow: 0 2px 10px rgba(0,0,0,0.07); border-top: 5px solid {SAND}; height: 100%;}}
+.pill, .pill * {{ display:inline-block; background:{BIOCHAR}; color:{BONE} !important; padding: 0.15rem 0.7rem; border-radius: 2px;
+         font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em;
+         text-transform: uppercase; margin-bottom: 0.4rem;}}
+
+.process-card {{ background: {BONE}; border-radius: 3px; padding: 1.2rem; text-align: center;
+                  border: 1px solid {LINE}; border-top: 3px solid {SIENNA}; height: 100%;}}
 .process-card .icon {{ font-size: 2.2rem; }}
-.process-card h4 {{ color: {NAVY}; margin: 0.4rem 0 0.3rem 0; font-family: 'Playfair Display', serif;}}
-.process-card p {{ color: {GREY}; font-size: 0.85rem; }}
+.process-card h4 {{ color: {BIOCHAR}; margin: 0.4rem 0 0.3rem 0; font-family: 'Fraunces', serif;}}
+.process-card p {{ color: {INK_SOFT}; font-size: 0.85rem; }}
+
+/* Streamlit's own buttons, in the mono-tracked CTA style */
+.stButton button {{ font-family: 'IBM Plex Mono', monospace !important; font-size: 0.76rem !important;
+    text-transform: uppercase; letter-spacing: 0.05em; border-radius: 2px !important; }}
+
+/* Native alert boxes (fallback, in case any st.info/warning/success slip through) */
+div[data-testid="stAlert"] {{ background-color: {BONE} !important; border-left: 3px solid {SIENNA_DARK} !important;
+    border-radius: 3px !important; color: {INK} !important; }}
+div[data-testid="stAlert"] * {{ color: {INK} !important; }}
+
+/* Slider track + handle in sienna */
+div[data-testid="stSlider"] div[role="slider"] {{ background-color: {SIENNA} !important; }}
+div[data-baseweb="slider"] div {{ background-color: {SIENNA} !important; }}
+
+/* Dataframe header */
+div[data-testid="stDataFrame"] {{ border: 1px solid {LINE}; border-radius: 3px; }}
 
 footer, #MainMenu {{ visibility: hidden; }}
 </style>
@@ -95,22 +135,31 @@ footer, #MainMenu {{ visibility: hidden; }}
 
 PLOTLY_TEMPLATE = dict(
     layout=go.Layout(
-        font=dict(family="Inter, sans-serif", color=DARK, size=13),
-        plot_bgcolor="white", paper_bgcolor="rgba(0,0,0,0)",
-        colorway=[NAVY, SAND, RUST, GREEN, LIGHTGREY],
+        font=dict(family="Inter, sans-serif", color=INK, size=13),
+        title=dict(font=dict(family="Fraunces, serif", color=BIOCHAR, size=16)),
+        plot_bgcolor=BONE, paper_bgcolor="rgba(0,0,0,0)",
+        colorway=[BIOCHAR, SIENNA, SIENNA_DARK, GREEN, SAND_2],
         margin=dict(l=10, r=10, t=50, b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
 )
 
+def section_head(tag_text, title_text):
+    st.markdown(f'<div class="mono-tag">{tag_text}</div><h3 class="section-title">{title_text}</h3>',
+                unsafe_allow_html=True)
+
+def sub_head(text):
+    st.markdown(f'<h4 style="color:{BIOCHAR};font-family:\'Fraunces\',serif;margin-top:0.6rem;">{text}</h4>',
+                unsafe_allow_html=True)
+
 # ----------------------------------------------------------------------------
 # SIDEBAR — LIVE MODEL CONTROLS
 # ----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("## 🌱 SAHARASOIL")
+    st.markdown("## SAHARASOIL")
     st.caption("360° Investor Dashboard · Group 10 · SP Jain SGM")
     st.markdown("---")
-    st.markdown("### 🎛️ Live Model Controls")
+    st.markdown("### Live Model Controls")
     st.caption("Every chart on this dashboard recalculates from these levers — exactly like the underlying Excel model, live.")
 
     price = st.slider("Bulk price (AED/tonne)", 600, 1300, int(DEFAULTS["price"]), 10)
@@ -157,19 +206,23 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 if not is_default:
-    st.info("🎛️ You're viewing a **live, adjusted** scenario — every number below reflects your slider changes, not the validated defaults. Use *Reset* in the sidebar to return to the pitch-ready baseline.", icon="🎛️")
+    st.markdown("""<div class="callout sand"><b>You're viewing a live, adjusted scenario</b> — every number
+    below reflects your slider changes, not the validated defaults. Use <i>Reset</i> in the sidebar to return
+    to the pitch-ready baseline.</div>""", unsafe_allow_html=True)
 
-def metric_card(col, label, value, sub=""):
+def metric_card(col, label, value, sub="", value_color=None):
+    vc = f"color:{value_color} !important;" if value_color else ""
     col.markdown(f"""<div class="metric-card"><div class="label">{label}</div>
-        <div class="value">{value}</div><div class="sub">{sub}</div></div>""", unsafe_allow_html=True)
+        <div class="value" style="{vc}">{value}</div><div class="sub">{sub}</div></div>""", unsafe_allow_html=True)
 
 c1, c2, c3, c4, c5 = st.columns(5)
 metric_card(c1, "3-Year Revenue", f"AED {m['year1_rev']+m['year2_rev']+m['year3_rev']:,.0f}", "Y1+Y2+Y3 modelled")
 metric_card(c2, "Blended Gross Margin", f"{m['gross_margin'][-1]*100:.1f}%", "steady across the model")
 metric_card(c3, "EBITDA Turns Positive", m['ebitda_positive_q'], "first profitable quarter")
 metric_card(c4, "LTV : CAC (all-in)", f"{m['ltv_cac_allin']:.1f}x", "conservative, loaded CAC")
-runway_label = "✓ Covered" if m['runway_ok'] else "⚠ Short"
-metric_card(c5, "Runway at Current Ask", runway_label, f"trough AED {m['trough']:,.0f}")
+runway_label = "Covered" if m['runway_ok'] else "Short"
+metric_card(c5, "Runway at Current Ask", runway_label, f"trough AED {m['trough']:,.0f}",
+            value_color=GREEN if m['runway_ok'] else SIENNA_DARK)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -177,8 +230,8 @@ st.markdown("<br>", unsafe_allow_html=True)
 # TABS
 # ----------------------------------------------------------------------------
 tab_overview, tab_product, tab_market, tab_unit, tab_fin, tab_risk, tab_road, tab_ask = st.tabs(
-    ["🌍 Overview", "🧪 Product 360°", "📊 Market Sizing", "💰 Unit Economics",
-     "📈 Financial Model", "⚠️ Risk Register", "🗺️ Roadmap", "🎯 The Ask"]
+    ["Overview", "Product 360°", "Market Sizing", "Unit Economics",
+     "Financial Model", "Risk Register", "Roadmap", "The Ask"]
 )
 
 # ============================================================================
@@ -187,7 +240,7 @@ tab_overview, tab_product, tab_market, tab_unit, tab_fin, tab_risk, tab_road, ta
 with tab_overview:
     colA, colB = st.columns([3, 2])
     with colA:
-        st.markdown('<h3 class="section-title">The Problem, In Two Facts</h3>', unsafe_allow_html=True)
+        section_head("01 — Overview", "The Problem, In Two Facts")
         st.markdown(f"""
 <div class="callout"><b>Offices are paying for greenery that dies.</b> Generic imported soil isn't formulated for Gulf heat,
 saline water, or HVAC-dried air — biophilic installations decline fast, and ESG/WELL budgets fund constant replacement
@@ -199,7 +252,7 @@ waste to the office-greenery supply chain — until now.</div>
 """, unsafe_allow_html=True)
 
     with colB:
-        st.markdown('<h3 class="section-title">Business Model Snapshot</h3>', unsafe_allow_html=True)
+        section_head("Business Model", "Snapshot")
         st.markdown(f"""
 - **Customer:** plantscaping / facility-management contractors (B2B, not B2C)
 - **Product:** bulk camel-biochar soil blend + recurring top-dressing service
@@ -207,7 +260,7 @@ waste to the office-greenery supply chain — until now.</div>
 - **Moat:** feedstock proximity, formal offtake agreements, below industrial biochar producers' economics
 - **Ask:** AED {assumptions['funding_ask']:,.0f} — MVP setup, MOCCAE registration, and working-capital runway
 """)
-        st.markdown('<h3 class="section-title">Why This Dashboard</h3>', unsafe_allow_html=True)
+        section_head("Methodology", "Why This Dashboard")
         st.markdown("""
 Every figure here is **formula-driven**, not typed in. Move a slider in the sidebar — price, churn, tonnes per
 contractor, the funding ask — and revenue, margin, cash runway, and unit economics all recompute together,
@@ -218,23 +271,23 @@ exactly like the underlying financial model.
 # TAB: PRODUCT 360
 # ============================================================================
 with tab_product:
-    st.markdown('<h3 class="section-title">The Product, From Every Angle</h3>', unsafe_allow_html=True)
+    section_head("02 — Product", "The Product, From Every Angle")
 
-    st.markdown("#### The Circular Flow")
-    steps = [("🐪", "Source", "Camel manure from offtake-agreement farms across the Northern Emirates"),
-             ("🔥", "Process", "Finished biochar from an established external processor"),
-             ("🌱", "Blend", "Finished into a Gulf-climate-formulated soil amendment"),
-             ("🚚", "Supply", "Bulk delivery to plantscaping & facility-management contractors")]
+    sub_head("The Circular Flow — Source → Process → Blend → Supply")
+    steps = [("01", "Source", "Camel manure from offtake-agreement farms across the Northern Emirates"),
+             ("02", "Process", "Finished biochar from an established external processor"),
+             ("03", "Blend", "Finished into a Gulf-climate-formulated soil amendment"),
+             ("04", "Supply", "Bulk delivery to plantscaping & facility-management contractors")]
     cols = st.columns(4)
-    for col, (icon, title, desc) in zip(cols, steps):
-        col.markdown(f"""<div class="process-card"><div class="icon">{icon}</div><h4>{title}</h4><p>{desc}</p></div>""",
+    for col, (num, title, desc) in zip(cols, steps):
+        col.markdown(f"""<div class="process-card"><div class="icon">{num}</div><h4>{title}</h4><p>{desc}</p></div>""",
                       unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     colL, colR = st.columns(2)
 
     with colL:
-        st.markdown("#### Competitive Positioning (illustrative — pending pilot validation)")
+        sub_head("Competitive Positioning (illustrative — pending pilot validation)")
         categories = ["Heat Tolerance", "Salinity Tolerance", "Water Retention", "Circularity / ESG",
                       "Cost Efficiency", "Local Sourcing"]
         saharasoil_scores = [9, 8, 8, 10, 7, 10]
@@ -245,7 +298,7 @@ with tab_product:
                                        line_color=GREEN, fillcolor="rgba(63,107,79,0.25)"))
         fig.add_trace(go.Scatterpolar(r=generic_scores + [generic_scores[0]],
                                        theta=categories + [categories[0]], fill='toself', name='Generic imported soil',
-                                       line_color=RUST, fillcolor="rgba(156,75,59,0.15)"))
+                                       line_color=SIENNA_DARK, fillcolor="rgba(156,75,59,0.15)"))
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])),
                            template=PLOTLY_TEMPLATE, height=380, showlegend=True,
                            title="Saharasoil vs. generic imported soil (1–10 scale)")
@@ -253,23 +306,23 @@ with tab_product:
         st.caption("Directional scores for pitch purposes — not lab-verified. Validate with agronomic pilot testing (see Risk Register).")
 
     with colR:
-        st.markdown("#### Blend Composition")
+        sub_head("Blend Composition")
         fig2 = go.Figure(data=[go.Pie(labels=["Biochar", "Compost, sand & manure carrier"], values=[27, 73],
-                                       hole=0.55, marker_colors=[SAND, NAVY], textinfo="label+percent")])
+                                       hole=0.55, marker_colors=[SIENNA, BIOCHAR], textinfo="label+percent")])
         fig2.update_layout(template=PLOTLY_TEMPLATE, height=380,
                             title="~27% biochar / ~73% compost, sand & manure by weight")
         st.plotly_chart(fig2, use_container_width=True)
         st.caption("At ~27% blend share and ~AED 1,300/t physical biochar, the AED 350/t input cost used across this model is internally consistent.")
 
-    st.markdown("#### Feedstock Diversification — 5-Year View")
+    sub_head("Feedstock Diversification — 5-Year View")
     years = ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"]
     camel = [100, 90, 65, 45, 35]
     cow = [0, 10, 30, 35, 35]
     poultry = [0, 0, 0, 10, 15]
     palm = [0, 0, 5, 10, 15]
     fig3 = go.Figure()
-    for name, vals, color in [("Camel manure", camel, NAVY), ("Cow / dairy manure", cow, SAND),
-                                ("Poultry litter", poultry, RUST), ("Date-palm biomass", palm, GREEN)]:
+    for name, vals, color in [("Camel manure", camel, BIOCHAR), ("Cow / dairy manure", cow, SIENNA),
+                                ("Poultry litter", poultry, SIENNA_DARK), ("Date-palm biomass", palm, GREEN)]:
         fig3.add_trace(go.Scatter(x=years, y=vals, mode="lines", name=name, stackgroup="one",
                                    line=dict(width=0.5), fillcolor=color, line_color=color))
     fig3.update_layout(template=PLOTLY_TEMPLATE, height=340, yaxis_title="% of feedstock mix",
@@ -281,7 +334,7 @@ with tab_product:
 # TAB: MARKET SIZING
 # ============================================================================
 with tab_market:
-    st.markdown('<h3 class="section-title">TAM · SAM · SOM</h3>', unsafe_allow_html=True)
+    section_head("03 — Market Sizing", "TAM · SAM · SOM")
 
     colL, colR = st.columns([3, 2])
     with colL:
@@ -291,13 +344,13 @@ with tab_market:
                "SOM<br><span style='font-size:0.8em'>Realistic Year-5 capture</span>"],
             x=[1670000000, 105210000, 275000],
             textposition="inside", textinfo="value",
-            marker={"color": [NAVY, SAND, RUST]},
+            marker={"color": [BIOCHAR, SIENNA, SIENNA_DARK]},
         ))
         fig.update_layout(template=PLOTLY_TEMPLATE, height=420, title="Market sizing funnel (USD)")
         st.plotly_chart(fig, use_container_width=True)
 
     with colR:
-        st.markdown("#### How we got there")
+        sub_head("How we got there")
         st.markdown("""
 | Step | Value |
 |---|---|
@@ -312,10 +365,10 @@ with tab_market:
 rather than guessing a market-share percentage — a small, defensible bite beats an inflated one under Q&A.</div>""",
                      unsafe_allow_html=True)
 
-    st.markdown("#### UAE Landscaping Market Growth")
+    sub_head("UAE Landscaping Market Growth")
     fig4 = go.Figure()
     fig4.add_trace(go.Scatter(x=[2024, 2025, 2030], y=[1.67, 1.8, 2.84], mode="lines+markers",
-                               line=dict(color=NAVY, width=3), marker=dict(size=10), name="TechSci Research"))
+                               line=dict(color=BIOCHAR, width=3), marker=dict(size=10), name="TechSci Research"))
     fig4.update_layout(template=PLOTLY_TEMPLATE, height=320, yaxis_title="USD Billions",
                         title="UAE Landscaping Market — USD 1.67B (2024) → USD 2.84B (2030F), 9.07% CAGR")
     st.plotly_chart(fig4, use_container_width=True)
@@ -324,7 +377,7 @@ rather than guessing a market-share percentage — a small, defensible bite beat
 # TAB: UNIT ECONOMICS
 # ============================================================================
 with tab_unit:
-    st.markdown('<h3 class="section-title">Per-Tonne & Per-Contractor Economics</h3>', unsafe_allow_html=True)
+    section_head("04 — Unit Economics", "Per-Tonne & Per-Contractor Economics")
 
     c1, c2, c3, c4 = st.columns(4)
     metric_card(c1, "Bulk Gross Margin", f"{m['bulk_margin']*100:.1f}%", f"AED {m['bulk_gp_per_tonne']:.0f} / tonne")
@@ -338,7 +391,7 @@ with tab_unit:
         fig = go.Figure(data=[
             go.Bar(name="Gross margin %", x=["Bulk supply", "Top-dressing"],
                    y=[m['bulk_margin']*100, m['topdress_margin']*100],
-                   marker_color=[NAVY, SAND], text=[f"{m['bulk_margin']*100:.1f}%", f"{m['topdress_margin']*100:.0f}%"],
+                   marker_color=[BIOCHAR, SIENNA], text=[f"{m['bulk_margin']*100:.1f}%", f"{m['topdress_margin']*100:.0f}%"],
                    textposition="outside")
         ])
         fig.update_layout(template=PLOTLY_TEMPLATE, height=360, title="Gross margin by revenue line", yaxis_range=[0, 75])
@@ -347,7 +400,7 @@ with tab_unit:
     with colR:
         fig2 = go.Figure()
         fig2.add_trace(go.Scatter(x=[c*100 for c in m['churn_grid']], y=m['ltv_cac_sensitivity'],
-                                   mode="lines+markers", line=dict(color=RUST, width=3), marker=dict(size=9),
+                                   mode="lines+markers", line=dict(color=SIENNA_DARK, width=3), marker=dict(size=9),
                                    name="LTV:CAC (all-in)"))
         fig2.add_hline(y=3, line_dash="dash", line_color=GREEN, annotation_text="3x healthy B2B threshold")
         fig2.update_layout(template=PLOTLY_TEMPLATE, height=360, xaxis_title="Quarterly churn (%)",
@@ -359,7 +412,7 @@ even under much more conservative churn than the 5%/quarter base case, it stays 
 considered healthy for B2B. The narrow-CAC headline number ({m['ltv_cac_narrow']:.1f}x) is real, but the all-in number
 is the one we'd defend under questioning.</div>""", unsafe_allow_html=True)
 
-    with st.expander("📐 Methodology note — a correction we made to the source workbook"):
+    with st.expander("Methodology note — a correction we made to the source workbook"):
         st.markdown("""
 The uploaded workbook's `Gross profit / contractor` formula used the top-dressing **COGS%** where it should have used
 the top-dressing **margin%** (i.e. `1 − COGS%`) when adding top-dressing's contribution to per-contractor gross profit.
@@ -372,7 +425,7 @@ it's more favourable than the original file, and we'd rather you hear about the 
 # TAB: FINANCIAL MODEL
 # ============================================================================
 with tab_fin:
-    st.markdown('<h3 class="section-title">3-Year Quarterly Model</h3>', unsafe_allow_html=True)
+    section_head("05 — Financial Model", "3-Year Quarterly Model")
 
     c1, c2, c3, c4 = st.columns(4)
     metric_card(c1, "Year 1 Revenue", f"AED {m['year1_rev']:,.0f}")
@@ -381,8 +434,8 @@ with tab_fin:
     metric_card(c4, "EBITDA-Positive Quarter", m['ebitda_positive_q'])
 
     fig = go.Figure()
-    fig.add_trace(go.Bar(x=m['quarters'], y=m['bulk_rev'], name="Bulk revenue", marker_color=NAVY))
-    fig.add_trace(go.Bar(x=m['quarters'], y=m['topdress_rev'], name="Top-dressing revenue", marker_color=SAND))
+    fig.add_trace(go.Bar(x=m['quarters'], y=m['bulk_rev'], name="Bulk revenue", marker_color=BIOCHAR))
+    fig.add_trace(go.Bar(x=m['quarters'], y=m['topdress_rev'], name="Top-dressing revenue", marker_color=SIENNA))
     fig.update_layout(barmode="stack", template=PLOTLY_TEMPLATE, height=380, title="Quarterly revenue build")
     st.plotly_chart(fig, use_container_width=True)
 
@@ -390,28 +443,28 @@ with tab_fin:
     with colL:
         fig2 = go.Figure()
         fig2.add_trace(go.Scatter(x=m['quarters'], y=m['ebitda'], mode="lines+markers", name="EBITDA",
-                                   line=dict(color=RUST, width=3)))
-        fig2.add_hline(y=0, line_dash="dot", line_color=GREY)
+                                   line=dict(color=SIENNA_DARK, width=3)))
+        fig2.add_hline(y=0, line_dash="dot", line_color=INK_SOFT)
         fig2.update_layout(template=PLOTLY_TEMPLATE, height=360, title="EBITDA by quarter")
         st.plotly_chart(fig2, use_container_width=True)
     with colR:
         fig3 = go.Figure()
         fig3.add_trace(go.Scatter(x=m['quarters'], y=m['cum_cash_incl'], mode="lines+markers", name="Cumulative cash",
-                                   line=dict(color=NAVY, width=3), fill="tozeroy", fillcolor="rgba(31,59,77,0.12)"))
-        fig3.add_hline(y=0, line_dash="dash", line_color=RUST, annotation_text="cash-out line")
+                                   line=dict(color=BIOCHAR, width=3), fill="tozeroy", fillcolor="rgba(31,59,77,0.12)"))
+        fig3.add_hline(y=0, line_dash="dash", line_color=SIENNA_DARK, annotation_text="cash-out line")
         fig3.update_layout(template=PLOTLY_TEMPLATE, height=360,
                             title=f"Cumulative cash incl. ask of AED {assumptions['funding_ask']:,.0f}")
         st.plotly_chart(fig3, use_container_width=True)
 
-    status_color = GREEN if m['runway_ok'] else RUST
-    status_text = "✓ Ask covers the modelled runway" if m['runway_ok'] else "⚠ Cash goes negative — raise the ask or pull a lever"
+    status_color = GREEN if m['runway_ok'] else SIENNA_DARK
+    status_text = "Ask covers the modelled runway" if m['runway_ok'] else "Cash goes negative — raise the ask or pull a lever"
     st.markdown(f"""<div class="callout" style="border-left-color:{status_color}">
     <b>Runway status: {status_text}</b><br>
     Deepest modelled cash trough: <b>AED {m['trough']:,.0f}</b> · Model-derived recommended ask (trough × 1.10 buffer):
     <b>AED {m['recommended_ask']:,.0f}</b> · Current ask: <b>AED {assumptions['funding_ask']:,.0f}</b>
     </div>""", unsafe_allow_html=True)
 
-    with st.expander("📋 Full quarterly table"):
+    with st.expander("Full quarterly table"):
         df = pd.DataFrame({
             "Quarter": m['quarters'], "Active contractors": np.round(m['active'], 1),
             "Total revenue": np.round(m['total_rev']), "Total COGS": np.round(m['total_cogs']),
@@ -424,7 +477,7 @@ with tab_fin:
 # TAB: RISK REGISTER
 # ============================================================================
 with tab_risk:
-    st.markdown('<h3 class="section-title">⚠️ Demand-Side Risk — Read This First</h3>', unsafe_allow_html=True)
+    section_head("06 — Risk Register", "Demand-Side Risk — Read This First")
     st.markdown(f"""<div class="callout">
     <b>The cost side of this model is anchored to real market data. The demand side is the exposed assumption —
     and we're saying so ourselves.</b><br><br>
@@ -440,12 +493,12 @@ with tab_risk:
     in potted plants, planters, and landscaped beds — a narrower slice than "all biophilic office greenery" implies.
     </div>""", unsafe_allow_html=True)
 
-    st.markdown("#### How sensitive the model is to this one number")
+    sub_head("How sensitive the model is to this one number")
     df_sens = pd.DataFrame(m['tonnes_sensitivity'])
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df_sens['tonnes'], y=df_sens['breakeven_contractors'], mode="lines+markers",
-                              line=dict(color=RUST, width=3), marker=dict(size=10)))
-    fig.add_vline(x=assumptions['tonnes_per_contractor'], line_dash="dash", line_color=NAVY,
+                              line=dict(color=SIENNA_DARK, width=3), marker=dict(size=10)))
+    fig.add_vline(x=assumptions['tonnes_per_contractor'], line_dash="dash", line_color=BIOCHAR,
                   annotation_text="current setting")
     fig.update_layout(template=PLOTLY_TEMPLATE, height=340, xaxis_title="Tonnes / contractor / quarter",
                        yaxis_title="Contractors needed to break even (Year 3 opex)",
@@ -462,7 +515,7 @@ with tab_risk:
     contract. Three calls confirm or correct the single most load-bearing assumption in this model.</div>""",
                 unsafe_allow_html=True)
 
-    st.markdown('<h3 class="section-title">Business Risk Register</h3>', unsafe_allow_html=True)
+    section_head("06 — Risk Register", "Business Risk Register")
     risks = [
         ("Feedstock competition", "Industrial buyers (e.g. cement-plant fuel use) compete for camel manure",
          "Sourcing targets farms outside existing industrial buyers' radius; pay a higher-value-add price than commodity fuel use"),
@@ -478,16 +531,16 @@ with tab_risk:
         with cols[i % 2]:
             st.markdown(f"""<div class="metric-card" style="margin-bottom:1rem;">
                 <div class="pill">Risk</div><br><b>{title}</b>
-                <p style="color:{GREY};font-size:0.85rem;margin:0.4rem 0;">{risk}</p>
+                <p style="color:{INK_SOFT};font-size:0.85rem;margin:0.4rem 0;">{risk}</p>
                 <div class="pill" style="background:{GREEN};">Mitigation</div>
-                <p style="color:{DARK};font-size:0.85rem;">{mitig}</p>
+                <p style="color:{INK};font-size:0.85rem;">{mitig}</p>
                 </div>""", unsafe_allow_html=True)
 
 # ============================================================================
 # TAB: ROADMAP
 # ============================================================================
 with tab_road:
-    st.markdown('<h3 class="section-title">5-Year Roadmap — Geography, Feedstock & Segments</h3>', unsafe_allow_html=True)
+    section_head("07 — Roadmap", "5-Year Roadmap — Geography, Feedstock & Segments")
 
     roadmap = [
         dict(Year="Year 1", Phase="Launch", Start=0, Duration=1,
@@ -501,7 +554,7 @@ with tab_road:
         dict(Year="Year 5", Phase="Full Diversification", Start=4, Duration=1,
              Detail="Camel+cow+poultry+palm biomass · CEA pilot · GCC exploration"),
     ]
-    colors = [NAVY, SAND, RUST, GREEN, NAVY_DARK]
+    colors = [BIOCHAR, SIENNA, SIENNA_DARK, GREEN, BIOCHAR_2]
     fig = go.Figure()
     for i, r in enumerate(roadmap):
         fig.add_trace(go.Bar(y=[r["Phase"]], x=[r["Duration"]], base=[r["Start"]], orientation="h",
@@ -516,18 +569,19 @@ with tab_road:
     cols = st.columns(5)
     for col, r in zip(cols, roadmap):
         col.markdown(f"""<div class="metric-card"><div class="label">{r['Year']}</div>
-            <div style="color:{NAVY};font-weight:700;font-size:1rem;margin:0.3rem 0;">{r['Phase']}</div>
+            <div style="color:{BIOCHAR};font-weight:700;font-size:1rem;margin:0.3rem 0;">{r['Phase']}</div>
             <div class="sub">{r['Detail']}</div></div>""", unsafe_allow_html=True)
 
 # ============================================================================
 # TAB: THE ASK
 # ============================================================================
 with tab_ask:
-    st.markdown('<h3 class="section-title">The Ask</h3>', unsafe_allow_html=True)
+    section_head("08 — The Ask", "Funding the Runway")
     c1, c2, c3 = st.columns(3)
     metric_card(c1, "Current Ask", f"AED {assumptions['funding_ask']:,.0f}")
     metric_card(c2, "Model-Recommended Ask", f"AED {m['recommended_ask']:,.0f}", "trough × 1.10 buffer")
-    metric_card(c3, "Runway Status", "✓ Covered" if m['runway_ok'] else "⚠ Short")
+    metric_card(c3, "Runway Status", "Covered" if m['runway_ok'] else "Short",
+                value_color=GREEN if m['runway_ok'] else SIENNA_DARK)
 
     colL, colR = st.columns(2)
     with colL:
@@ -535,13 +589,13 @@ with tab_ask:
             labels=["Working capital / runway buffer", "Production & blending setup", "BD & contractor acquisition",
                     "MOCCAE registration & pilot testing", "Contingency"],
             values=[40, 25, 15, 10, 10], hole=0.45,
-            marker_colors=[NAVY, SAND, GREEN, RUST, LIGHTGREY])])
+            marker_colors=[BIOCHAR, SIENNA, GREEN, SIENNA_DARK, SAND_2])])
         fig.update_layout(template=PLOTLY_TEMPLATE, height=380, title="Use of funds")
         st.plotly_chart(fig, use_container_width=True)
     with colR:
         fig2 = go.Figure(data=[
             go.Bar(x=["Current ask", "Model-recommended"], y=[assumptions['funding_ask'], m['recommended_ask']],
-                   marker_color=[SAND, GREEN if m['runway_ok'] else RUST],
+                   marker_color=[SIENNA, GREEN if m['runway_ok'] else SIENNA_DARK],
                    text=[f"AED {assumptions['funding_ask']:,.0f}", f"AED {m['recommended_ask']:,.0f}"],
                    textposition="outside")
         ])
