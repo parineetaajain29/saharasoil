@@ -131,9 +131,10 @@ div[data-testid="stAlert"] {{ background-color: {BONE} !important; border-left: 
     border-radius: 3px !important; color: {INK} !important; }}
 div[data-testid="stAlert"] * {{ color: {INK} !important; }}
 
-/* Slider track + handle in sienna */
-div[data-testid="stSlider"] div[role="slider"] {{ background-color: {SIENNA} !important; }}
-div[data-baseweb="slider"] div {{ background-color: {SIENNA} !important; }}
+/* Slider handle — the track fill/background now comes correctly from
+   .streamlit/config.toml's primaryColor, so we only need to tint the handle. */
+div[data-testid="stSlider"] div[role="slider"] {{ background-color: {SIENNA} !important;
+    border-color: {SIENNA} !important; }}
 
 /* Dataframe header */
 div[data-testid="stDataFrame"] {{ border: 1px solid {LINE}; border-radius: 3px; }}
@@ -146,7 +147,7 @@ PLOTLY_TEMPLATE = dict(
     layout=go.Layout(
         font=dict(family="Inter, sans-serif", color=INK, size=13),
         title=dict(font=dict(family="Fraunces, serif", color=BIOCHAR, size=16)),
-        plot_bgcolor=BONE, paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor=BONE, paper_bgcolor=SAND,
         colorway=[BIOCHAR, SIENNA, SIENNA_DARK, GREEN, SAND_2],
         margin=dict(l=10, r=10, t=50, b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -171,22 +172,29 @@ with st.sidebar:
     st.markdown("### Live Model Controls")
     st.caption("Every chart on this dashboard recalculates from these levers — exactly like the underlying Excel model, live.")
 
-    price = st.slider("Bulk price (AED/tonne)", 600, 1300, int(DEFAULTS["price"]), 10)
+    if "reset_nonce" not in st.session_state:
+        st.session_state.reset_nonce = 0
+    nz = st.session_state.reset_nonce  # suffix baked into every slider key below
+
+    price = st.slider("Bulk price (AED/tonne)", 600, 1300, int(DEFAULTS["price"]), 10, key=f"price_{nz}")
     tonnes_pc = st.slider("Tonnes per contractor / quarter", 2.0, 14.0, DEFAULTS["tonnes_per_contractor"], 0.5,
+                           key=f"tonnes_pc_{nz}",
                            help="Flagged in the model as THE swing variable — unvalidated, moves the outcome more than price or cost.")
-    churn = st.slider("Quarterly contractor churn", 0.02, 0.30, DEFAULTS["churn"], 0.01, format="%.2f")
-    signings_mult = st.slider("Signings-pace multiplier", 0.5, 2.0, 1.0, 0.1,
+    churn = st.slider("Quarterly contractor churn", 0.02, 0.30, DEFAULTS["churn"], 0.01, format="%.2f", key=f"churn_{nz}")
+    signings_mult = st.slider("Signings-pace multiplier", 0.5, 2.0, 1.0, 0.1, key=f"signings_mult_{nz}",
                                help="Scales the whole contractor-signing ramp up or down, keeping its shape.")
-    deposit_pct = st.slider("Upfront deposit on signing (share)", 0.0, 0.6, DEFAULTS["deposit_pct"], 0.05, format="%.2f")
-    funding_ask = st.slider("Funding ask (AED)", 200000, 900000, int(DEFAULTS["funding_ask"]), 10000)
+    deposit_pct = st.slider("Upfront deposit on signing (share)", 0.0, 0.6, DEFAULTS["deposit_pct"], 0.05,
+                             format="%.2f", key=f"deposit_pct_{nz}")
+    funding_ask = st.slider("Funding ask (AED)", 200000, 900000, int(DEFAULTS["funding_ask"]), 10000, key=f"funding_ask_{nz}")
 
     with st.expander("Advanced: cost structure"):
-        feedstock_cost = st.slider("Feedstock cost (AED/t)", 0, 400, int(DEFAULTS["feedstock_cost"]), 10)
-        biochar_cost = st.slider("Biochar sourcing (AED/t)", 100, 700, int(DEFAULTS["biochar_cost"]), 10)
-        blending_cost = st.slider("Blending & packaging (AED/t)", 0, 300, int(DEFAULTS["blending_cost"]), 10)
-        opex_y3 = st.slider("Year 3 fixed opex (AED/qtr)", 40000, 150000, int(DEFAULTS["opex_y3"]), 1000)
+        feedstock_cost = st.slider("Feedstock cost (AED/t)", 0, 400, int(DEFAULTS["feedstock_cost"]), 10, key=f"feedstock_cost_{nz}")
+        biochar_cost = st.slider("Biochar sourcing (AED/t)", 100, 700, int(DEFAULTS["biochar_cost"]), 10, key=f"biochar_cost_{nz}")
+        blending_cost = st.slider("Blending & packaging (AED/t)", 0, 300, int(DEFAULTS["blending_cost"]), 10, key=f"blending_cost_{nz}")
+        opex_y3 = st.slider("Year 3 fixed opex (AED/qtr)", 40000, 150000, int(DEFAULTS["opex_y3"]), 1000, key=f"opex_y3_{nz}")
 
     if st.button("↺ Reset to validated defaults", use_container_width=True):
+        st.session_state.reset_nonce += 1
         st.rerun()
 
     st.markdown("---")
